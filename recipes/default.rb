@@ -6,10 +6,17 @@ node.set[:nodejs][:checksum_linux_x64] = "2791efef0a1e9a9231b937e55e5b783146e232
 
 include_recipe "nodejs::install_from_binary"
 
+package 'unzip'
+
 ### Setup User and Install Directory
 include_recipe "ghost::user"
 
-directory node[:ghost][:install_path] do
+extract_dir = "#{node[:ghost][:install_path]}/ghost"
+ghost_path = "#{node[:ghost][:install_path]}/ghost/ghost-#{node[:ghost][:ghost_version]}.zip"
+ghost_url = "#{node[:ghost][:src_url]}/ghost-#{node[:ghost][:ghost_version]}.zip"
+
+### Create Ghost Site Directory
+directory extract_dir do
   owner node[:ghost][:user]
   group node[:ghost][:user]
   mode "0755"
@@ -17,37 +24,32 @@ directory node[:ghost][:install_path] do
   action :create
 end
 
-### Download and Extract Ghost Archive
-include_recipe "ark"
-
-ark 'ghost' do
-  url node[:ghost][:src_url]
-  path node[:ghost][:install_path]
-  owner node[:ghost][:user]
-  strip_leading_dir false
-  action :put
+### Download Ghost Zip File
+remote_file ghost_path do
+	source "#{ghost_url}"
+	owner node[:ghost][:user]
 end
 
-extract_dir = ::File.join(node[:ghost][:install_path], "ghost")
-
-### Work-around for bug in ark cookbook
+### Unzip Ghost File Into Site Directory
 bash "unzip_ghost" do
-  cwd Chef::Config[:file_cache_path]
-  code "unzip -q -u -o #{Chef::Config[:file_cache_path]}/ghost.zip -d #{extract_dir}"
-  not_if do
-    File.exists?("#{extract_dir}/config.js")
-  end
+  cwd extract_dir
+  code "unzip -q -u -o #{ghost_path} -d #{extract_dir}"
+end
+
+### Delete Ghost Zip File
+file ghost_path do
+  action :delete
 end
 
 ### Install Dependencies
 bash "install_ghost" do
-  cwd extract_dir 
+  cwd extract_dir
   code "npm install --production"
 end
 
 bash "install_mysql_npm" do
   cwd extract_dir
-  code "npm install mysql" 
+  code "npm install mysql"
 end
 
 ### Load Secrets from Databag
@@ -88,7 +90,7 @@ bash "set_ownership" do
   code "chown -R #{node[:ghost][:user]}:#{node[:ghost][:user]} #{node[:ghost][:install_path]}"
 end
 
-### Create Service 
+### Create Service
 case node[:platform]
 when "ubuntu"
   if node["platform_version"].to_f >= 9.10
@@ -97,7 +99,7 @@ when "ubuntu"
       mode "0644"
       variables(
         :user		=> node[:ghost][:user],
-        :dir		=> extract_dir 
+        :dir		=> extract_dir
       )
     end
   end
