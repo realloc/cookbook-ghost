@@ -55,7 +55,8 @@ end
 
 ### Create Config
 template ::File.join(extract_dir, "config.js") do
-  source "config.js.erb"
+  cookbook node[:ghost][:config_cookbook]
+  source 'config.js.erb'
   owner node[:ghost][:user]
   group node[:ghost][:user]
   mode "0660"
