@@ -1,5 +1,3 @@
-include_recipe 'database::mysql'
-
 if node[:ghost][:databag]
   databag = Chef::EncryptedDataBagItem.load(node[:ghost][:databag], node[:ghost][:databag_item])
   node.set_unless[:ghost][:db_admin_password] = databag['ghost']['db_admin_password'] rescue nil
